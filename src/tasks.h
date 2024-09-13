@@ -15,6 +15,10 @@ typedef enum {
     TASK_COUNT
 } TaskType;
 
+typedef struct {
+    
+} HTTPConstrict;
+
 struct Task;
 typedef struct Task{
     int socket,size,index;

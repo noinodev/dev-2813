@@ -7,6 +7,9 @@
 #include <stdlib.h>
 //#include "../lib/cJSON.h"
 
+const char* URI[TASK_COUNT] = {"/auth/create", "/auth/login", "/api/sample", "/api/file"};
+
+
 void* worker_thread(void* arg) {
     printf("connection to postgres... ");
     PGconn* conn = PQconnectdb("user=postgres dbname=postgres password=dev2813 hostaddr=127.0.0.1 port=5432");
@@ -31,17 +34,6 @@ void* worker_thread(void* arg) {
     struct phr_header headers[32];
     size_t num_headers;
     int i, ret;
-
-    /*char threadname[33];
-    srand(time(NULL));
-    for(int j = 0; j < 32; j++) threadname[j] = 'A'+(rand()%26);*/
-
-    /*for (i = 0; i < 10000000; i++) {
-        num_headers = sizeof(headers) / sizeof(headers[0]);
-        ret = phr_parse_request(REQ, sizeof(REQ) - 1, &method, &method_len, &path, &path_len, &minor_version, headers, &num_headers,
-                                0);
-        assert(ret == sizeof(REQ) - 1);
-    }*/
 
     while (1) {
 
@@ -90,10 +82,10 @@ void* worker_thread(void* arg) {
             const json_t *parent = NULL;
 
             unsigned char tasks[TASK_COUNT];
-            tasks[TASK_AUTH_CREATE] = strncmp(path, "/accounts/create", path_len);
-            tasks[TASK_AUTH_LOGIN] = strncmp(path, "/accounts/login", path_len);
-            tasks[TASK_DB_SUBMIT] = strncmp(path, "/samples/upload", path_len);
-            tasks[TASK_IMG_SUBMIT] = strncmp(path, "/samples/image", path_len);
+            tasks[TASK_AUTH_CREATE] = strncmp(path, URI[TASK_AUTH_CREATE], path_len);
+            tasks[TASK_AUTH_LOGIN] = strncmp(path, URI[TASK_AUTH_LOGIN], path_len);
+            tasks[TASK_DB_SUBMIT] = strncmp(path, URI[TASK_DB_SUBMIT], path_len);
+            tasks[TASK_IMG_SUBMIT] = strncmp(path, URI[TASK_IMG_SUBMIT], path_len);
             //printf("ac[%i], lg[%i], db[%i], ig[%i]\n",tasks[TASK_AUTH_CREATE] ,tasks[TASK_AUTH_LOGIN] ,tasks[TASK_DB_SUBMIT] ,tasks[TASK_IMG_SUBMIT] );
 
             if(tasks[TASK_IMG_SUBMIT] != 0){

@@ -17,4 +17,8 @@ void session_remove_key(const char* key);
 int session_find_key(const char* key);
 int session_auth(PGconn* conn, const char* key);
 
+//int http_check_json
+//int http_check_auth
+
+
 #endif

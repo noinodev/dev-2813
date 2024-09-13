@@ -173,6 +173,12 @@ int task_img_upload(Task* task, const char *buffer, const int buffer_size, const
 
     //fd_block[task->index] = 1;
 
+    unsigned char c[MD5_DIGEST_LENGTH];
+    int i;
+    MD5_CTX mdContext;
+    unsigned char data[IMG_CHUNK_SIZE];
+    MD5_Init (&mdContext);
+
     FILE *file = fopen(filename, "wb");
     if (file == NULL) {
         perror("Error opening file for writing");
@@ -181,49 +187,24 @@ int task_img_upload(Task* task, const char *buffer, const int buffer_size, const
     // write first part of image
     size_t written = 0;
     written += fwrite(buffer, 1, buffer_size, file);
-
-    for (int i = 0; i < buffer_size; i++) {
-        //printf("%02X ", buffer[i] & 0xFF);
-    }
+    MD5_Update (&mdContext, buffer, written);
 
     // continue to get rest of image
     char nbuff[IMG_CHUNK_SIZE];
     memset(nbuff, 0, sizeof(nbuff));
-    ssize_t bytes_read;
+    ssize_t bytes_read,bytes_written = 0;
     while ((bytes_read = recv(task->socket, nbuff, sizeof(nbuff), 0)) > 0) {
         // Write the received chunk to the file
-        if(written < total_size) written += fwrite(nbuff, 1, (written+bytes_read) > total_size ? total_size-written : bytes_read, file);
+        if(written < total_size) bytes_written = fwrite(nbuff, 1, (written+bytes_read) > total_size ? total_size-written : bytes_read, file);
+        written += bytes_written;
+        MD5_Update (&mdContext, nbuff, bytes_written);
     }
 
-    printf("written/total: %i/%i\n",written,total_size);
+    MD5_Final (c,&mdContext);
+    //printf("written/total: %i/%i\n",written,total_size);
     fclose(file);
 
-
-    // CHECK MD5 SUM AGAINST DB
-
-    unsigned char c[MD5_DIGEST_LENGTH];
-    int i;
-    FILE *inFile = fopen (filename, "rb");
-    MD5_CTX mdContext;
-    int bytes;
-    unsigned char data[1024];
-
-    if (inFile == NULL) {
-        printf ("%s can't be opened.\n", filename);
-        return 0;
-    }
-
-    MD5_Init (&mdContext);
-    while ((bytes = fread (data, 1, 1024, inFile)) != 0)
-        MD5_Update (&mdContext, data, bytes);
-    MD5_Final (c,&mdContext);
-    //for(i = 0; i < MD5_DIGEST_LENGTH; i++) snprintf(hash[i], sizeof(hash),"%02x", c[i]);//snprintf(hash,sizeof(hash),"%02x", c[i]);
-    //printf ("\n");
-    fclose (inFile);
-
-    //printf("the fuck??????\n");
     char buf[MD5_DIGEST_LENGTH * 2 + 1];
-    //compute_md5("hello world", digest);
     for (int i = 0, j = 0; i < 16; i++, j+=2)
         sprintf(buf+j, "%02x", c[i]);
     buf[MD5_DIGEST_LENGTH * 2] = 0;
@@ -237,6 +218,8 @@ int task_img_upload(Task* task, const char *buffer, const int buffer_size, const
             //remove(filename);
         }else{
             printf("image is in table\n");
+
+            
 
             char outfile[64] = {0};
             snprintf(outfile,64,"res/%s.png",buf);
