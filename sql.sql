@@ -10,3 +10,12 @@ CREATE TABLE geo_metadata (
 	sample_flora TEXT,
 	sample_calls TEXT
 );
+
+CREATE TABLE usr_auth (
+	id SERIAL PRIMARY KEY,
+	uname VARCHAR(255) UNIQUE NOT NULL,
+	passhash VARCHAR(255) NOT NULL,
+	email VARCHAR(255) NOT NULL,
+	apikey VARCHAR(255) UNIQUE,
+	last_login TIMESTAMP
+);
