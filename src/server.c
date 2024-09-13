@@ -1,4 +1,5 @@
 #include "server.h"
+#include "tasks.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -34,43 +35,7 @@ void set_nonblocking(int fd) {
 
 int nfds = 1;
 struct pollfd fds[MAX_CLIENTS];
-TaskQueue task_queue = {
-    .tasks = {{0}},
-    .head = 0,
-    .tail = 0,
-    .count = 0,
-    .mutex = PTHREAD_MUTEX_INITIALIZER,
-    .cond = PTHREAD_COND_INITIALIZER
-};
-
-// Add task to the queue
-void enqueue_task(int client_fd, const char* query) {
-    pthread_mutex_lock(&task_queue.mutex);
-    while (task_queue.count == QUEUE_SIZE) {
-        pthread_cond_wait(&task_queue.cond, &task_queue.mutex);
-    }
-    task_queue.tasks[task_queue.tail].client_fd = client_fd;
-    strncpy(task_queue.tasks[task_queue.tail].query, query, sizeof(task_queue.tasks[task_queue.tail].query) - 1);
-    task_queue.tail = (task_queue.tail + 1) % QUEUE_SIZE;
-    task_queue.count++;
-    pthread_cond_signal(&task_queue.cond);
-    pthread_mutex_unlock(&task_queue.mutex);
-}
-
-// Get task from the queue
-Task dequeue_task() {
-    Task task;
-    pthread_mutex_lock(&task_queue.mutex);
-    while (task_queue.count == 0) {
-        pthread_cond_wait(&task_queue.cond, &task_queue.mutex);
-    }
-    task = task_queue.tasks[task_queue.head];
-    task_queue.head = (task_queue.head + 1) % QUEUE_SIZE;
-    task_queue.count--;
-    pthread_cond_signal(&task_queue.cond);
-    pthread_mutex_unlock(&task_queue.mutex);
-    return task;
-}
+char fd_block[MAX_CLIENTS];
 
 int main() {
     int server_fd, client_fd, max_fd;
@@ -123,11 +88,13 @@ int main() {
 
     // Prepare the array for poll/WSAPoll
     memset(fds, 0, sizeof(fds));
+    memset(fd_block, 0, sizeof(fd_block));
 
     // Set the first slot to monitor the server socket
     fds[0].fd = server_fd;
     fds[0].events = POLLIN;  // Monitor for incoming connections
 
+    //unsigned char client_ip[ADDRLEN];
     while (1) {
         // Use WSAPoll on Windows and poll on Unix
         int poll_count = POLL(fds, nfds, -1);
@@ -145,6 +112,7 @@ int main() {
                 perror("accept");
                 continue;
             }
+            //memcpy(buffer, &(address.sin_addr), sizeof(address.sin_addr));
 
             // Add new client to the poll array
             fds[nfds].fd = client_fd;
@@ -156,38 +124,21 @@ int main() {
 
         // Check the other clients for incoming data
         for (int i = 1; i < nfds; i++) {
-            if (fds[i].revents & POLLIN) {
+            if ((fds[i].revents & POLLIN) && fd_block[i] == 0) {
                 // Receive data from the client
+                //char* buffer_http = buffer+ADDRLEN;
                 int bytes_received = recv(fds[i].fd, buffer, BUFFER_SIZE - 1, 0);
                 if (bytes_received > 0) {
                     buffer[bytes_received] = '\0';
-                    //printf("Received: %s\n", buffer);
 
-                    /*const char* http_response = "HTTP/1.1 200 OK\r\n"
-                                    "Content-Length: 13\r\n"
-                                    "Connection: close\r\n"
-                                    "\r\n"
-                                    "Hello, morgus!";*/
-                    //int res = send(fds[i].fd, http_response, strlen(http_response), 0);
-                    //printf("Sent http request: '%i'\n",res);
-                    //const char* sql_query = "INSERT INTO geo_metadata (image_md5, timestamp, latitude, longitude, altitude, sample_geo, sample_fauna, sample_flora)\
-                                            VALUES ('your_md5_hash', '2024-09-10 10:15:30', 40.712776, -74.005974, 15.5,null,null,null);";
-                    const char *sql_query = 
-                    enqueue_task(fds[i].fd,sql_query);
-                    //CLOSE_SOCKET(fds[i].fd);
-                    //fds[i] = fds[nfds - 1];  // Move last entry to current slot
-                    //nfds--;   
+                    enqueue_task(bytes_received,fds[i].fd,buffer,i);
+                    fd_block[i] = 1;
                 } else if (bytes_received == 0) {
                     // Client disconnected
                     printf("Client disconnected, fd: %d\n", fds[i].fd);
                     CLOSE_SOCKET(fds[i].fd);
                     fds[i].fd = -1;
                 }
-            }else if (fds[i].revents & (POLLERR | POLLHUP)) {
-                // Handle errors or hangups
-                printf("Socket %d encountered an error\n", fds[i].fd);
-                CLOSE_SOCKET(fds[i].fd);
-                fds[i].fd = -1;
             }
         }
 

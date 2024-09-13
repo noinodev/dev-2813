@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <pthread.h>
 #include <libpq-fe.h>
+#include <time.h>
 
 #if defined(_WIN32) || defined(_WIN64)
 #include <winsock2.h>
@@ -38,40 +39,18 @@ void cleanup_winsock();
 
 #endif
 
+#define ADDRLEN 4
 #define PORT 8888
 #define BUFFER_SIZE 1024
 #define MAX_CLIENTS 500
 #define NUM_WORKERS 4
 #define QUEUE_SIZE 100
+#define IMG_CHUNK_SIZE 8192
 
-typedef enum {
-    TASK_TYPE_SQL,
-    TASK_TYPE_RECV_IMAGE,
-    TASK_TYPE_SEND_IMAGE
-} TaskType;
-
-typedef struct {
-    TaskType type;
-    int client_fd;
-    char query[BUFFER_SIZE];
-} Task;
-
-// Thread-safe task queue
-typedef struct {
-    Task tasks[QUEUE_SIZE];
-    int head;
-    int tail;
-    int count;
-    pthread_mutex_t mutex;
-    pthread_cond_t cond;
-} TaskQueue;
-
-extern TaskQueue task_queue;
 extern int nfds;
 extern struct pollfd fds[];
+extern char fd_block[];
 
-void enqueue_task(int client_fd, const char* query);
-Task dequeue_task();
 void* worker_thread(void* arg);
 
 #endif

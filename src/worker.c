@@ -1,52 +1,157 @@
 #include "server.h"
+#include "tasks.h"
+#include "auth.h"
+//#include <assert.h>
+#include "../lib/picohttpparser.h"
+#include "../lib/tiny-json.h"
+#include <stdlib.h>
+//#include "../lib/cJSON.h"
 
 void* worker_thread(void* arg) {
-    printf("starting worker thread\n");
+    printf("connection to postgres... ");
     PGconn* conn = PQconnectdb("user=postgres dbname=postgres password=dev2813 hostaddr=127.0.0.1 port=5432");
     if (PQstatus(conn) != CONNECTION_OK) {
         fprintf(stderr, "Connection to database failed: %s\n", PQerrorMessage(conn));
         PQfinish(conn);
         return NULL;
     }
+    printf("ok!\n");
+
+    /*char buf[4096], *method, *path;
+    int pret, minor_version;
+    struct phr_header headers[100];
+    size_t buflen = 0, prevbuflen = 0, method_len, path_len, num_headers;
+    ssize_t rret;*/
+
+    const char *method;
+    size_t method_len;
+    const char *path;
+    size_t path_len;
+    int minor_version;
+    struct phr_header headers[32];
+    size_t num_headers;
+    int i, ret;
+
+    /*char threadname[33];
+    srand(time(NULL));
+    for(int j = 0; j < 32; j++) threadname[j] = 'A'+(rand()%26);*/
+
+    /*for (i = 0; i < 10000000; i++) {
+        num_headers = sizeof(headers) / sizeof(headers[0]);
+        ret = phr_parse_request(REQ, sizeof(REQ) - 1, &method, &method_len, &path, &path_len, &minor_version, headers, &num_headers,
+                                0);
+        assert(ret == sizeof(REQ) - 1);
+    }*/
 
     while (1) {
-        Task task = dequeue_task();
-        
-        PGresult* res = PQexec(conn, task.query);
-        if (PQresultStatus(res) != PGRES_TUPLES_OK) {
-            fprintf(stderr, "query no: %s\n", PQerrorMessage(conn));
-            PQclear(res);
-            continue;
-        }else printf("query yes\n");
 
-        int nrows = PQntuples(res);
-        int nfields = PQnfields(res);
+        Task task;
+        dequeue_task(&task);
+        //printf("new task: %i bytes\n%s",task.size,task.buffer);
 
-        // Build the HTTP response
-        char response[BUFFER_SIZE];
-        int offset = 0;
+        num_headers = sizeof(headers) / sizeof(headers[0]);
+        ret = phr_parse_request(task.buffer, task.size, &method, &method_len, &path, &path_len, &minor_version, headers, &num_headers,0);
 
-        // Write HTTP headers
-        offset += snprintf(response + offset, sizeof(response) - offset,
-                           "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n",
-                           nrows * nfields * 50); // Approximate content length
 
-        // Write query results
-        for (int i = 0; i < nrows; i++) {
-            for (int j = 0; j < nfields; j++) {
-                const char* value = PQgetvalue(res, i, j);
-                offset += snprintf(response + offset, sizeof(response) - offset, "%s\t", value);
+        char* body = task.buffer+ret;
+        int header_auth = -1, header_contenttype = -1, header_contentlen = -1;
+
+        for (int i = 0; i != num_headers; ++i) {
+            if(strncmp(headers[i].name,"Authorization: ",headers[i].name_len) == 0) header_auth = i;
+            else if(strncmp(headers[i].name,"Content-Type: ",headers[i].name_len) == 0) header_contenttype = i;
+            else if(strncmp(headers[i].name,"Content-Length: ",headers[i].name_len) == 0) header_contentlen = i;
+        }
+
+        if(strncmp(method,"GET",method_len) == 0){
+            printf("why the fuck is this get?\n");
+            if(header_auth != -1){
+                const char* authkey = headers[header_auth].value+strlen("Bearer ");
+                printf("GET request with authkey [%i]: %s\n",strlen(authkey),authkey);
+                session_auth(conn,authkey);
+                printf("Packet has been validated!\n");
+                http(task.socket,200,"OK",".");
+            }else{
+                http(task.socket,401,"Unauthorized","No authkey");
             }
-            offset += snprintf(response + offset, sizeof(response) - offset, "\r\n");
-        }
+        }else if(strncmp(method,"POST",method_len) == 0){
+            //printf("POST... ");
 
-        // Send the response to the client
-        if (send(task.client_fd, response, offset, 0) < 0) {
-            perror("send");
-        }
+            char length[64];
+            char* errptr;
+            snprintf(length,64,"%.*s", (int)headers[header_contentlen].value_len, headers[header_contentlen].value);
+            //printf("length: %s\n",length);
+            int totallength = strtol(length,&errptr,10);
+            //printf("int length: %i\n",totallength);
+            int bodylength = task.size - (body - task.buffer);
 
-        PQclear(res);
-        CLOSE_SOCKET(task.client_fd);
+            //printf("URI: %.*s\n",(int)path_len,path);
+
+            json_t pool[64];
+            const json_t *parent = NULL;
+
+            unsigned char tasks[TASK_COUNT];
+            tasks[TASK_AUTH_CREATE] = strncmp(path, "/accounts/create", path_len);
+            tasks[TASK_AUTH_LOGIN] = strncmp(path, "/accounts/login", path_len);
+            tasks[TASK_DB_SUBMIT] = strncmp(path, "/samples/upload", path_len);
+            tasks[TASK_IMG_SUBMIT] = strncmp(path, "/samples/image", path_len);
+            //printf("ac[%i], lg[%i], db[%i], ig[%i]\n",tasks[TASK_AUTH_CREATE] ,tasks[TASK_AUTH_LOGIN] ,tasks[TASK_DB_SUBMIT] ,tasks[TASK_IMG_SUBMIT] );
+
+            if(tasks[TASK_IMG_SUBMIT] != 0){
+                if(header_contenttype == -1 || header_contentlen == -1){
+                    http(task.socket,400,"Bad Request","No body for parse");
+                    continue;
+                }//else printf("header content ok... ");
+                if(strncmp(headers[header_contenttype].value,"application/json",headers[header_contenttype].value_len) != 0){
+                    http(task.socket,400,"Bad Request","Content-type should be application/json");
+                    continue;
+                }//else printf("content type ok... ");
+                parent = json_create(body,pool,64);
+                if(parent == NULL){
+                    http(task.socket,400,"Bad Request","Malformed JSON body");
+                    for(int i = 0; i < bodylength; i++) printf("%c",body[i]);
+                    continue;
+                }
+            }else{
+                if(strncmp(headers[header_contenttype].value,"application/octet-stream",headers[header_contenttype].value_len) != 0){
+                    http(task.socket,400,"Bad Request","Content-type should be octet-stream");
+                    continue;
+                }
+            }
+
+            //int meta = strncmp(path, "/samples/upload", path_len), img = strncmp(path, "/samples/image", path_len);
+
+            int task_ret = 0;
+            if ( tasks[TASK_AUTH_CREATE] == 0) task_ret = task_auth_create(&task,parent,conn);
+            else if ( tasks[TASK_AUTH_LOGIN]  == 0) task_ret = task_auth_get(&task,parent,conn);
+            else if ( tasks[TASK_DB_SUBMIT] == 0 || tasks[TASK_IMG_SUBMIT] == 0 ) {
+                if(header_auth == -1){
+                    http(task.socket,401,"Unauthorized","No API key in header");
+                    continue;
+                }//else printf("header auth ok... ");
+                char authkey[65];
+                strncpy(authkey,headers[header_auth].value+strlen("Bearer "),64);
+                if(session_auth(conn,authkey) != 1){
+                    http(task.socket,401,"Unauthorized","Invalid API key");
+                    continue;
+                }// printf("AUTH ok... ");
+                // Handle sample upload
+                if(tasks[TASK_DB_SUBMIT] == 0) task_ret = task_db_upload(&task,parent,conn);
+                else if(tasks[TASK_IMG_SUBMIT] == 0) task_ret = task_img_upload(&task,body,bodylength < totallength ? bodylength : totallength,totallength, conn);
+                ///printf("Handling sample upload\n");
+            } else {
+                http(task.socket,404,"Not Found","URI not found");
+                continue;
+            }
+
+            if(task_ret == 1){
+                //printf("it worked\n");
+                http(task.socket,200,"OK",".");
+            }else{
+                //printf("didnt work.\n");
+                http(task.socket,400,"Bad Request","Malformed request, undefined error");
+            }
+        }
+        fd_block[task.index] = 0;
     }
 
     PQfinish(conn);
