@@ -4,9 +4,9 @@
 #define TASKS_H
 #include <stdio.h>
 #include "server.h"
-//#include <libpq-fe.h>
 #include "../lib/tiny-json.h"
 
+// Task URI indices
 typedef enum {
     TASK_AUTH_CREATE,
     TASK_AUTH_LOGIN,
@@ -15,17 +15,19 @@ typedef enum {
     TASK_COUNT
 } TaskType;
 
+//temp unused
 typedef struct {
-    
+
 } HTTPConstrict;
 
+// Task struct for queue
 struct Task;
 typedef struct Task{
     int socket,size,index;
     char buffer[BUFFER_SIZE];
 } Task;
 
-// Thread-safe task queue
+// Circular queue
 typedef struct {
     Task tasks[QUEUE_SIZE];
     int head;
@@ -37,6 +39,7 @@ typedef struct {
 
 extern TaskQueue task_queue;
 
+// SQL statement preset indices
 enum SQLExecStatements{
     SQL_GETAUTHKEY,
     SQL_CHECKAUTHKEY,
@@ -46,18 +49,15 @@ enum SQLExecStatements{
 
 extern const char* sqlexec[];
 
+// task scheduling
 void enqueue_task(int size, int socket, char* buffer, int index);
 void dequeue_task();
 
+// http response helper functions
 void http(int socket, int code, const char *status, const char *message);
 void httpjson(int socket, const char *json);
 
-int task_parsehttp(Task*);
-int task_dbsubmit(Task*);
-int task_dbfetch(Task*);
-int task_sendimg(Task*);
-int handle_recvimg(Task*);
-
+// task functions
 int task_auth_create(Task* task,const json_t* json,PGconn* conn);
 int task_auth_get(Task* task,const json_t* json,PGconn* conn);
 int task_db_upload(Task* task,const json_t* json,PGconn* conn);

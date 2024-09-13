@@ -47,10 +47,10 @@ void cleanup_winsock();
 #define QUEUE_SIZE 1000
 #define IMG_CHUNK_SIZE 8192
 
-extern int nfds;
-extern struct pollfd fds[];
-extern char fd_block[];
+extern int nfds; // number of active sockets
+extern struct pollfd fds[]; // array of active sockets
+extern char fd_block[]; // array of blocked sockets ( binary packets exceeding buffer size )
 
-void* worker_thread(void* arg);
+void* worker_thread(void* arg); // worker thread function
 
 #endif
