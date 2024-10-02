@@ -1,4 +1,4 @@
-curl -X POST http://localhost:8888/api/file --data-binary "@another.png" -H "Content-Type: application/octet-stream" -H "Authorization: Bearer UCDHAIGXTFRXVCCIAGOMBJXOQLWTUORBTCTIRKURPPNRVQIACQINDSXTSGGCFXJR"
+curl -X POST http://localhost:8888/api/file --data-binary "@example.png" -H "Content-Type: application/octet-stream" -H "Authorization: Bearer UCDHAIGXTFRXVCCIAGOMBJXOQLWTUORBTCTIRKURPPNRVQIACQINDSXTSGGCFXJR"
 curl -X POST http://localhost:8888/api/sample -H "Content-Type: application/json" -H "Authorization: Bearer UCDHAIGXTFRXVCCIAGOMBJXOQLWTUORBTCTIRKURPPNRVQIACQINDSXTSGGCFXJR" -d @body.json
 curl -X POST http://localhost:8888/auth/login -H "Content-Type: application/json" -d {\"username\":\"user\",\"password\":\"pass\",\"email\":\"user@example.com\"}
 curl -X POST http://localhost:8888/auth/create -H "Content-Type: application/json" -d {\"username\":\"noino\",\"password\":\"notsaferrr!\",\"email\":\"noptheranotheruser@example.com\"}

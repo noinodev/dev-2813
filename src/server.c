@@ -41,6 +41,8 @@ void set_nonblocking(int fd) {
 int nfds = 1;
 struct pollfd fds[MAX_CLIENTS];
 char fd_block[MAX_CLIENTS];
+int tasks = 0;
+int streamtasks = 0;
 
 int main() {
     // init server
@@ -99,7 +101,15 @@ int main() {
     fds[0].events = POLLIN;
 
     // start task scheduling loop
+    int time = clock();
     while (1) {
+        if(clock()-time > CLOCKS_PER_SEC){
+            time = clock();
+            if(tasks > 0) printf("tasks this second: %i\n",tasks);
+            if(streamtasks > 0) printf("streamtasks : %i\n",streamtasks);
+            tasks = 0;
+            streamtasks = 0;
+        }
         int poll_count = POLL(fds, nfds, -1);
         if (poll_count == -1) {
             perror("poll");
@@ -112,19 +122,18 @@ int main() {
             if (client_fd < 0) {
                 perror("accept");
                 continue;
-            }
+            }//else printf("n");
 
             fds[nfds].fd = client_fd;
             fds[nfds].events = POLLIN;
             nfds++;
-
-            //printf("New connection accepted, fd: %d\n", client_fd);
         }
 
         for (int i = 1; i < nfds; i++) {
             if ((fds[i].revents & POLLIN) && fd_block[i] == 0) {
                 int bytes_received = recv(fds[i].fd, buffer, BUFFER_SIZE - 1, 0);
                 if (bytes_received > 0) {
+                    //printf("br:: %i\n",bytes_received);
                     buffer[bytes_received] = '\0';
 
                     enqueue_task(bytes_received,fds[i].fd,buffer,i);
@@ -140,10 +149,12 @@ int main() {
         // socket buffer cleaner or something
         for (int i = 0; i < nfds; i++) {
             if (fds[i].fd == -1) {
-                for (int j = i; j < nfds - 1; j++) {
+                fds[i] = fds[--nfds];
+                fds[nfds].fd = -1;
+                /*for (int j = i; j < nfds - 1; j++) {
                     fds[j] = fds[j + 1];
                 }
-                nfds--;
+                nfds--;*/
             }
         }
     }

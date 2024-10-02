@@ -11,7 +11,7 @@ SRCSRV = $(OBJDIR)server.o $(OBJDIR)worker.o $(OBJDIR)auth.o $(OBJDIR)tasks.o $(
 
 # compiler info
 CC = gcc
-CFLAGS = -c
+CFLAGS = -c -O3
 
 # build server
 server: $(SRCSRV)

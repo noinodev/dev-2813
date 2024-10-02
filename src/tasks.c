@@ -67,6 +67,7 @@ void http(int socket, int code, const char *status, const char *message) {
              code, status, message);
 
     send(socket, response, strlen(response), 0);
+    //printf("%i %s: %s\n",code,status,message);
 }
 
 // Generic JSON response function
@@ -85,7 +86,7 @@ void httpjson(int socket, const char *json) {
 
 // Push new user account to database
 int task_auth_create(Task* task, const json_t* json, PGconn* conn){
-    printf("creating account\n");
+    //printf("creating account\n");
     int ret = 0;
 
     const json_t *usernf, *passnf, *emailnf;
@@ -111,13 +112,13 @@ int task_auth_create(Task* task, const json_t* json, PGconn* conn){
     const char *sqlparams[4] = { user, pass, email, authkey};
     PGresult *pgres = PQexecParams(conn,sqlexec[SQL_ADDUSER],4,NULL,sqlparams,NULL,NULL,0);
     if (PQresultStatus(pgres) != PGRES_COMMAND_OK) {
-        fprintf(stderr, "query no: %s\n", PQerrorMessage(conn));
+        //////fprintf(stderr, "query no: %s\n", PQerrorMessage(conn));
         http(task->socket,409,"Conflict","Username or email already exists");
-        PQclear(pgres);
+        //PQclear(pgres);
     }else{
         session_add_key(authkey);
         char json[128];
-        snprintf(json,128,"{\"api_key\": \"%s\"}",authkey);
+        //////snprintf(json,128,"{\"api_key\": \"%s\"}",authkey);
         httpjson(task->socket,json);
         ret = 1;
     }
@@ -158,7 +159,7 @@ int task_auth_get(Task* task, const json_t* json, PGconn* conn){
             ret = 1;
         }
     } else {
-        fprintf(stderr, "Query failed: %s\n", PQerrorMessage(conn));
+        ////////////////fprintf(stderr, "Query failed: %s\n", PQerrorMessage(conn));
     }
 
     PQclear(pgres);
@@ -304,9 +305,9 @@ int task_db_upload(Task* task, const json_t* json, PGconn* conn){
     sql_get_json_array(arg[0],arrfloranf);
     sql_get_json_array(arg[1],arrfaunanf);
     sql_get_json_array(arg[2],arrcallsnf);
-    printf("%s\n",arg[0]);
-    printf("%s\n",arg[1]);
-    printf("%s\n",arg[2]);
+    ////printf("%s\n",arg[0]);
+    ////printf("%s\n",arg[1]);
+    ////printf("%s\n",arg[2]);
 
 
     // i think this is the only seriously unsafe sql query that i need to paramaterize but i just didnt get around to it yet, its not that i dont know how to make it safe i just cant be bothered
@@ -316,7 +317,7 @@ int task_db_upload(Task* task, const json_t* json, PGconn* conn){
             md5,time,strtod(lat,&endptr),strtod(lon,&endptr),strtod(alt,&endptr),geo,arg[0],arg[1],arg[2]);
     PGresult *pgres = PQexec(conn,sql);
 
-    if (PQresultStatus(pgres) != PGRES_COMMAND_OK) printf("Query failed: %s\n", PQerrorMessage(conn));
+    /////if (PQresultStatus(pgres) != PGRES_COMMAND_OK) printf("Query failed: %s\n", PQerrorMessage(conn));
     PQclear(pgres);
    return 1;
 }
