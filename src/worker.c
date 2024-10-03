@@ -42,8 +42,6 @@ void* worker_thread(void* arg) {
             stream = 0;
             streamtasks++;
         }
-
-        tasks++;
         int totallength = 0;
         int bodylength = 0;
 
@@ -158,6 +156,7 @@ void* worker_thread(void* arg) {
 
             // tell the client the outcome of their task
             if(task_ret == 1) http(task.socket,200,"OK",".");
+            //else http(task.socket,400,"Bad Request","");
         }
         // reset socket block for this thread
 

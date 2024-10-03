@@ -49,8 +49,8 @@ void cleanup_winsock();
 extern int nfds; // number of active sockets
 extern struct pollfd* fds; // array of active sockets
 extern char* fd_block; // array of blocked sockets ( binary packets exceeding buffer size )
-extern _Atomic int tasks;
-extern _Atomic int streamtasks;
+extern _Atomic int tasks,streamtasks,count_db,count_login,count_create;
+//extern _Atomic int streamtasks;
 
 void* worker_thread(void* arg); // worker thread function
 

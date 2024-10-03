@@ -42,8 +42,7 @@ int nfds = 1;
 struct pollfd* fds;
 char* fd_block;
 int* fd_timeout;
-_Atomic int tasks = 0;
-_Atomic int streamtasks = 0;
+_Atomic int tasks = 0, streamtasks = 0, count_db = 0, count_create = 0, count_login = 0;
 
 int main(int argc, char** argv) {
     // init server
@@ -111,8 +110,10 @@ int main(int argc, char** argv) {
     while (1) {
         if(clock()-time > CLOCKS_PER_SEC){
             time = clock();
-            if(tasks > 0) printf("tasks this second: %i\n",tasks);
-            if(streamtasks > 0) printf("streamtasks : %i\n",streamtasks);
+            if(tasks > 0) printf("tasks this second: %i\ndb: %i, login: %i, create: %i\n",tasks+streamtasks,count_db,count_login,count_create);
+            count_db = 0;
+            count_login = 0;
+            count_create = 0;
             tasks = 0;
             streamtasks = 0;
         }

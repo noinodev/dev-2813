@@ -95,12 +95,6 @@ char* WORDS[] = {
     "avocado"
 };
 
-const char* URI[] = {"/auth/create", "/auth/login", "/api/sample", "/api/file"};
-const char* TYPE[] = {"application/json","application/octet-stream"};
-
-_Atomic volatile int fails = 0;
-_Atomic volatile int succs = 0;
-
 char* rword(){
     return WORDS[rand()%32];
 }
@@ -169,76 +163,24 @@ void baka(char* str){
 int http(int socket) {
     char message[1024];
     // uri, type, body
-    int i = rand()%9;
+    int i = rand()%12;
     if(i < 3) create(message);
     else if(i < 6) login(message);
-    else db(message);
+    else if(i <= 9) db(message);
+    else baka(message);
+
 
     int j = send(socket, message, strlen(message), 0);
+    printf("SEND %i BYTES:\n%s\n",j,message);
     if(j <= 0){
         //printf("%i, %d ",j,WSAGetLastError());
         return 0;
     }else return 1;
 }
 
-typedef struct ccpc {
-    int cc,pc;
-    struct sockaddr_in server;
-} ccpc;
-
-void* worker_thread(void* arg){
-    ccpc *a = (ccpc*)arg;
-    // create TCP socket
-    int* clientsock = malloc(a->cc*sizeof(int));
-    for(int i = 0; i < a->cc; i++){
-        clientsock[i] = socket(AF_INET, SOCK_STREAM, 0);
-        //int flag = 1;
-        //setsockopt(clientsock[i], IPPROTO_TCP, TCP_NODELAY, (void *)&flag, sizeof(int));
-        if (clientsock[i]  == INVALID_SOCKET_CODE) {
-            perror("socket");
-            #ifdef _WIN32
-            cleanup_winsock();
-            #endif
-            exit(EXIT_FAILURE);
-        }
-    }
-
-    printf("Attempting to connect... ");
-
-    // attempt connection
-    for(int i = 0; i < a->cc; i++){
-        int res = connect(clientsock[i], (struct sockaddr *) &a->server, sizeof(a->server));
-        if (res < 0) {
-            perror("ERROR connection failed");
-            return 0;
-        }else printf("%i,",i);
-    }
-    printf("all sockets open!\n");
-
-    // integration test, fire off packets as fast as possible
-    int time = clock();
-    for(int j = 0; j < a->pc; j++){
-        for(int i = 0; i < a->cc; i++){
-            if(clock()-time > 10*CLOCKS_PER_SEC) goto end;
-            if(http(clientsock[i]) == 0){
-                //printf("failed at %i,%i\n",j,i);
-                fails += a->cc-i;
-                break;
-            }else succs++;
-        }
-    }
-
-    // cleanup
-    end:
-    printf("time to send: %lf\n",((double)(clock()-time))/CLOCKS_PER_SEC);
-    for(int i = 0; i < a->cc; i++) CLOSE_SOCKET(clientsock[i]);
-    free(clientsock);
-    return NULL;
-}
-
 int main(int argc, char** argv) {
     srand(time(NULL));
-    int cc = atoi(argv[2]), pc = atoi(argv[3]), tc = atoi(argv[1]);
+    int pc = atoi(argv[1]);
     struct sockaddr_in server;
 
     #ifdef _WIN32
@@ -251,16 +193,45 @@ int main(int argc, char** argv) {
     server.sin_family = AF_INET;
     server.sin_port = htons(8888);
 
-    ccpc a = {cc,pc,server};
-    pthread_t* workers = (pthread_t*)malloc(tc*sizeof(pthread_t));
-    for (int i = 0; i < tc; ++i) pthread_create(&workers[i], NULL, worker_thread, (void*)&a);
     
-    
+    int clientsock = socket(AF_INET, SOCK_STREAM, 0);
+        //int flag = 1;
+        //setsockopt(clientsock[i], IPPROTO_TCP, TCP_NODELAY, (void *)&flag, sizeof(int));
+    if (clientsock  == INVALID_SOCKET_CODE) {
+        perror("socket");
+        #ifdef _WIN32
+        cleanup_winsock();
+        #endif
+        exit(EXIT_FAILURE);
+    }
+    printf("Attempting to connect... ");
 
-    for (int i = 0; i < tc; ++i) pthread_join(workers[i],NULL);
-    printf("packets: %i\n",succs);
-    printf("fails: %i\n",fails);
-    free(workers);
+    int res = connect(clientsock, (struct sockaddr *)&server, sizeof(server));
+    if (res < 0) {
+        perror("ERROR connection failed");
+        return 0;
+    }
+    printf("ok!\n");
+
+    // integration test, fire off packets as fast as possible
+    long double avgtime;
+    char buff[1024] = {0};
+    for(int j = 0; j < pc; j++){
+        int t = clock();
+        printf("[%i] PING\n",j);
+        http(clientsock);
+        int bytes = recv(clientsock,buff,1024-1,0);
+        int time = clock()-t;
+        if(bytes <= 0) perror("recv");
+        else printf("RECV %i BYTES:\n",bytes);
+        buff[bytes] = 0;
+        avgtime += (double)time/pc;
+        printf("%s\n",buff);
+        printf("PONG [%lf]\n-------------\n\n",time);
+    }
+
+    printf("Average response time: %lf",avgtime);
+    
     #ifdef _WIN32
     cleanup_winsock();
     #endif

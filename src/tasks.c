@@ -118,11 +118,13 @@ int task_auth_create(Task* task, const json_t* json, PGconn* conn){
     }else{
         session_add_key(authkey);
         char json[128];
-        //////snprintf(json,128,"{\"api_key\": \"%s\"}",authkey);
+        snprintf(json,128,"{\"api_key\": \"%s\"}",authkey);
         httpjson(task->socket,json);
-        ret = 1;
+        //printf("create:! %s\n",json);
+        ret = 2;
     }
     PQclear(pgres);
+    count_create++;
     return ret;
 }
 
@@ -156,13 +158,19 @@ int task_auth_get(Task* task, const json_t* json, PGconn* conn){
             snprintf(json,128,"{\"api_key\": \"%s\"}",authkey);
             // return api token to client
             httpjson(task->socket,json);
-            ret = 1;
-        }
+            //printf("login:! %s\n",json);
+            ret = 2;
+        }else goto fail;
     } else {
-        ////////////////fprintf(stderr, "Query failed: %s\n", PQerrorMessage(conn));
+        /////fprintf(stderr, "Query failed: %s\n", PQerrorMessage(conn));
+        goto fail;
     }
 
+    fail:
+    http(task->socket,401,"Unauthorized","Incorrect username or password");
+
     PQclear(pgres);
+    count_login++;
     return ret;
 }
 
@@ -317,7 +325,8 @@ int task_db_upload(Task* task, const json_t* json, PGconn* conn){
             md5,time,strtod(lat,&endptr),strtod(lon,&endptr),strtod(alt,&endptr),geo,arg[0],arg[1],arg[2]);
     PGresult *pgres = PQexec(conn,sql);
 
-    /////if (PQresultStatus(pgres) != PGRES_COMMAND_OK) printf("Query failed: %s\n", PQerrorMessage(conn));
+    //if (PQresultStatus(pgres) != PGRES_COMMAND_OK) printf("Query failed: %s\n", PQerrorMessage(conn));
+    if (PQresultStatus(pgres) == PGRES_COMMAND_OK) count_db++;
     PQclear(pgres);
-   return 1;
+    return 1;
 }
