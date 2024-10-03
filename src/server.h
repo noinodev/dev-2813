@@ -42,15 +42,15 @@ void cleanup_winsock();
 #define ADDRLEN 4
 #define PORT 8888
 #define BUFFER_SIZE 1024
-#define MAX_CLIENTS 500
+#define MAX_CLIENTS 10000
 #define QUEUE_SIZE 1000
 #define IMG_CHUNK_SIZE 8192
 
 extern int nfds; // number of active sockets
-extern struct pollfd fds[]; // array of active sockets
-extern char fd_block[]; // array of blocked sockets ( binary packets exceeding buffer size )
-extern int tasks;
-extern int streamtasks;
+extern struct pollfd* fds; // array of active sockets
+extern char* fd_block; // array of blocked sockets ( binary packets exceeding buffer size )
+extern _Atomic int tasks;
+extern _Atomic int streamtasks;
 
 void* worker_thread(void* arg); // worker thread function
 

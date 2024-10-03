@@ -171,7 +171,7 @@ int http(int socket) {
 
     int j = send(socket, message, strlen(message), 0);
     if(j <= 0){
-        printf("%i, %d ",j,WSAGetLastError());
+        //printf("%i, %d ",j,WSAGetLastError());
         return 0;
     }else return 1;
 }
@@ -181,7 +181,8 @@ typedef struct ccpc {
     struct sockaddr_in server;
 } ccpc;
 
-int fails = 0;
+_Atomic volatile int fails = 0;
+_Atomic volatile int succs = 0;
 
 void* worker_thread(void* arg){
     ccpc *a = (ccpc*)arg;
@@ -218,10 +219,10 @@ void* worker_thread(void* arg){
         for(int i = 0; i < a->cc; i++){
             if(clock()-time > 10*CLOCKS_PER_SEC) goto end;
             if(http(clientsock[i]) == 0){
-                printf("failed at %i,%i\n",j,i);
-                fails++;
+                //printf("failed at %i,%i\n",j,i);
+                fails += a->cc-i;
                 break;
-            }
+            }else succs++;
         }
     }
 
@@ -253,6 +254,7 @@ int main(int argc, char** argv) {
     
 
     for (int i = 0; i < tc; ++i) pthread_join(workers[i],NULL);
+    printf("packets: %i\n",succs);
     printf("fails: %i\n",fails);
     free(workers);
     #ifdef _WIN32
