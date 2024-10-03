@@ -43,7 +43,6 @@ void cleanup_winsock();
 #define PORT 8888
 #define BUFFER_SIZE 1024
 #define MAX_CLIENTS 500
-#define NUM_WORKERS 5
 #define QUEUE_SIZE 1000
 #define IMG_CHUNK_SIZE 8192
 

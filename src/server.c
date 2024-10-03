@@ -44,16 +44,19 @@ char fd_block[MAX_CLIENTS];
 int tasks = 0;
 int streamtasks = 0;
 
-int main() {
+int main(int argc, char** argv) {
     // init server
+    byte num_workers = 1;
+    if(argv[1] != NULL) num_workers = atoi(argv[1]);
     int server_fd, client_fd, max_fd;
     struct sockaddr_in address;
     int addrlen = sizeof(address);
     char buffer[BUFFER_SIZE];
 
+
     // init thread pool
-    pthread_t workers[NUM_WORKERS];
-    for (int i = 0; i < NUM_WORKERS; ++i) pthread_create(&workers[i], NULL, worker_thread, NULL);
+    pthread_t workers[num_workers];
+    for (int i = 0; i < num_workers; ++i) pthread_create(&workers[i], NULL, worker_thread, NULL);
 
     #ifdef _WIN32
     init_winsock(); // self explanatory i think
@@ -160,7 +163,7 @@ int main() {
     }
 
     // end threads
-    for (int i = 0; i < NUM_WORKERS; ++i) pthread_cancel(workers[i]);
+    for (int i = 0; i < num_workers; ++i) pthread_cancel(workers[i]);
 
     // cleanup
     CLOSE_SOCKET(server_fd);

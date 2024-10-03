@@ -103,7 +103,6 @@ char* rword(){
 }
 
 void create(char* str){
-    //printf("create");
     char json[512];
     snprintf(json, 512, "{\"username\":\"%s\",\"password\":\"%s!\",\"email\":\"%s@gmail.com\"}", rword(), rword(), rword());
     snprintf(str,1024,
@@ -114,7 +113,6 @@ void create(char* str){
 }
 
 void login(char* str){
-    //printf("login");
     char json[512];
     snprintf(json,512,"{\"username\":\"%s\",\"password\":\"%s!\"}",rword(),rword());
     snprintf(str,1024,
@@ -123,11 +121,9 @@ void login(char* str){
             "Content-Length: %i\n\n%s\r\n",
             strlen(json),json
     );
-    //printf("json: %s\nlen: %i\n",json,strlen(json));
 }
 
 void db(char* str){
-    //printf("db");
     char json[512];
     snprintf(json,512,
         "{\"img_md5\":\"%s%s%s\","
@@ -165,7 +161,6 @@ void baka(char* str){
 }
 
 int http(int socket) {
-    //int uri = rand()%sizeof(URI);
     srand(clock());
     char message[1024];
     // uri, type, body
@@ -173,17 +168,12 @@ int http(int socket) {
     if(i < 3) create(message);
     else if(i < 6) login(message);
     else db(message);
-    //baka(message);
-    //login(message);
-    //printf("%s\n",message);
 
     int j = send(socket, message, strlen(message), 0);
     if(j <= 0){
-        perror("send: ");
+        printf("%i, %d ",j,WSAGetLastError());
         return 0;
     }else return 1;
-    //if(j != strlen(message)) printf("problem: %i/%i\n",j,strlen(message));
-    //printf("\n%s\n, ",message);
 }
 
 typedef struct ccpc {
@@ -225,20 +215,19 @@ void* worker_thread(void* arg){
     // integration test, fire off packets as fast as possible
     int time = clock();
     for(int j = 0; j < a->pc; j++){
-        //printf("%i,",j);
         for(int i = 0; i < a->cc; i++){
-            //printf("%i,",j,i);
+            if(clock()-time > 10*CLOCKS_PER_SEC) goto end;
             if(http(clientsock[i]) == 0){
                 printf("failed at %i,%i\n",j,i);
                 fails++;
                 break;
             }
         }
-        //printf("%i,",j);
     }
-    printf("time to send: %lf\n",((double)(clock()-time))/CLOCKS_PER_SEC);
 
     // cleanup
+    end:
+    printf("time to send: %lf\n",((double)(clock()-time))/CLOCKS_PER_SEC);
     for(int i = 0; i < a->cc; i++) CLOSE_SOCKET(clientsock[i]);
     free(clientsock);
     return NULL;
@@ -251,18 +240,6 @@ int main(int argc, char** argv) {
     #ifdef _WIN32
     init_winsock(); // self explanatory i think
     #endif
-
-    /*struct hostent *host;
-    host = gethostbyname("127.0.0.1");
-
-    char* ipaddr;
-    if (host == NULL) {
-        printf("ERROR cannot resolve hostname\n");
-        return 0;
-    }
-    
-        
-    ipaddr = inet_ntoa(*(struct in_addr*)host->h_addr_list[0]);*/
     char* ipaddr = "127.0.0.1";
 
     // define target -> TCP server at ipaddr:port

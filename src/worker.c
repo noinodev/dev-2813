@@ -31,17 +31,16 @@ void* worker_thread(void* arg) {
     int i, ret;
     int stream = 0;
 
-    //Task task;
-    //char buffer_stream[BUFFER_SIZE] = {0};
+    Task task;
 
     while (1) {
-        // pop task from task queue, this is where i would implement work stealing
-        Task task;
-        if(stream == 0) dequeue_task(&task);
-        else{
+        // pop task from task queue, this is where i would implement work stealing if i werent lazy
+        if(stream == 0){
+            dequeue_task(&task);
+            tasks++;
+        }else{
             stream = 0;
-            //if(bytes<0) perror("recv: ");
-            //printf("STREAM <%i new bytes>:---------------\n%s\nEND---------\n",bytes,task.buffer);
+            streamtasks++;
         }
 
         tasks++;
@@ -52,7 +51,6 @@ void* worker_thread(void* arg) {
         num_headers = sizeof(headers) / sizeof(headers[0]);
         ret = phr_parse_request(task.buffer, task.size, &method, &method_len, &path, &path_len, &minor_version, headers, &num_headers,0);
         if(ret == -1){
-            //printf("FAILED PARSE:\n%s\nEND---------------------------------\n",task.buffer);
             goto endstream;
         }
 
@@ -77,9 +75,6 @@ void* worker_thread(void* arg) {
                 // do nothing just OK
             }else{
                 http(task.socket,401,"Unauthorized","No authkey for GET");
-                //printf("RET: %i\n",ret);
-                //for(int i = 0; i < ret; i++) printf("%c",task.buffer[i]);
-                //for(int i = 0; i < bodylength; i++) printf("%c",task.buffer[i]);
             }
         }else if(strncmp(method,"POST",method_len) == 0){
             // parse POST request
@@ -92,7 +87,6 @@ void* worker_thread(void* arg) {
 
             char jsonstr[512];
             snprintf(jsonstr,totallength+1,"%s",body);
-            //printf("JSONSTR: %s\n",jsonstr);
 
             // initialize json memory pool
             json_t pool[64];
@@ -157,7 +151,6 @@ void* worker_thread(void* arg) {
                 // process task
                 if(tasks[TASK_DB_SUBMIT] == 0) task_ret = task_db_upload(&task,parent,conn); // upload sample
                 else if(tasks[TASK_IMG_SUBMIT] == 0) task_ret = task_img_upload(&task,body,bodylength < totallength ? bodylength : totallength,totallength, conn); // upload image
-                ///printf("Handling sample upload\n");
             } else {
                 http(task.socket,404,"Not Found","URI not found");
                 goto endstream;
@@ -165,52 +158,18 @@ void* worker_thread(void* arg) {
 
             // tell the client the outcome of their task
             if(task_ret == 1) http(task.socket,200,"OK",".");
-
-            //else http(task.socket,400,"Bad Request","Malformed request, undefined error");
-            
         }
         // reset socket block for this thread
 
         endstream:
-
-        // streaming prootocl
         if(ret > 0 && totallength > 0 && task.size > ret+2+totallength){
-            //printf("size: %i, ret: %i, len: %i, offset: %i\n",task.size,ret,totallength,ret+totallength+2);
-            //printf("BEFORE---------------\n%s\nEND---------\n",task.buffer);
-            //printf("SIZE BEFORE: %i\n",task.size);
-
             stream = 1;
             task.size = task.size-ret-totallength-2;
             memcpy(task.buffer,task.buffer+ret+totallength+2,task.size);
             int bytes = recv(task.socket,task.buffer+task.size,BUFFER_SIZE-1-task.size,0);
-            //printf("%i BYTES\n",bytes);
-            
-            //if(bytes<=0) perror("recv failed");
-            //if(bytes<=0) printf("errno: %d\n", errno);
             if(bytes>0) task.size += bytes;
             task.buffer[task.size] = 0;
-            enqueue_task(task.size,task.socket,task.buffer,task.index);
-            streamtasks++;
-
-            //printf("SIZE AFTER: %i\n",task.size);
-            //printf("%s\n",task.buffer);
-            //printf("AFTER---------------\n%s\nEND---------\n",task.buffer);
-            /////printf("STREAM:----------------------------------\n%s\nEND-------------------\n",task.buffer);
-
-            //memcpy(buffer_stream,task.buffer,ret+totallength);
-            //enqueue_task(task.size-ret-totallength,task.socket,)
-        }//else{
-            //printf("SOCKET UNLOCKED %i\n",task.socket);
-            //printf("FINAL TASK:\n%s\n",task.buffer);
-
-        //printf("t");
-        fd_block[task.index] = 0;
-    
-        //}
-
-
-
-        //tasks++;
+        }else fd_block[task.index] = 0;
     }
 
     // close db connection
