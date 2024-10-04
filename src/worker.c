@@ -42,6 +42,12 @@ void* worker_thread(void* arg) {
             stream = 0;
             streamtasks++;
         }
+
+        int time = clock();
+        LARGE_INTEGER frequency, start, end;
+        QueryPerformanceFrequency(&frequency);
+        QueryPerformanceCounter(&start);
+
         int totallength = 0;
         int bodylength = 0;
 
@@ -169,6 +175,14 @@ void* worker_thread(void* arg) {
             if(bytes>0) task.size += bytes;
             task.buffer[task.size] = 0;
         }else fd_block[task.index] = 0;
+
+        QueryPerformanceCounter(&end);
+
+        long long int t = end.QuadPart-start.QuadPart;
+        time_hr_res = frequency.QuadPart;
+        time_hr += t;
+        time_lr += clock()-time;
+        //printf("tasktime: %lli\n",t);
     }
 
     // close db connection

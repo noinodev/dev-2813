@@ -19,6 +19,8 @@ void cleanup_winsock();
 #define SOCKET_ERROR_CODE SOCKET_ERROR
 #define INVALID_SOCKET_CODE INVALID_SOCKET
 #define POLL WSAPoll
+#define CLOCK(a,b) QueryPerformanceFrequency(b);\
+                   QueryPerformanceCounter(a)
 typedef int socklen_t;
 
 #else
@@ -36,6 +38,7 @@ void cleanup_winsock();
 #define SOCKET_ERROR_CODE -1
 #define INVALID_SOCKET_CODE -1
 #define POLL poll
+#define CLOCK(a,b) clock_gettime(a)
 
 #endif
 
@@ -50,7 +53,7 @@ extern int nfds; // number of active sockets
 extern struct pollfd* fds; // array of active sockets
 extern char* fd_block; // array of blocked sockets ( binary packets exceeding buffer size )
 extern _Atomic int tasks,streamtasks,count_db,count_login,count_create;
-//extern _Atomic int streamtasks;
+extern _Atomic long long int time_hr,time_hr_res,time_lr;
 
 void* worker_thread(void* arg); // worker thread function
 

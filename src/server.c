@@ -43,6 +43,7 @@ struct pollfd* fds;
 char* fd_block;
 int* fd_timeout;
 _Atomic int tasks = 0, streamtasks = 0, count_db = 0, count_create = 0, count_login = 0;
+_Atomic long long int time_hr = 0, time_hr_res = 0, time_lr = 0;
 
 int main(int argc, char** argv) {
     // init server
@@ -55,7 +56,6 @@ int main(int argc, char** argv) {
     struct sockaddr_in address;
     int addrlen = sizeof(address);
     char buffer[BUFFER_SIZE];
-
 
     // init thread pool
     pthread_t workers[num_workers];
@@ -77,6 +77,7 @@ int main(int argc, char** argv) {
 
     // set server to non blocking
     set_nonblocking(server_fd);
+    setbuf(stdout, NULL);
 
     // get address and port and bind server to socket
     address.sin_family = AF_INET;
@@ -110,12 +111,22 @@ int main(int argc, char** argv) {
     while (1) {
         if(clock()-time > CLOCKS_PER_SEC){
             time = clock();
-            if(tasks > 0) printf("tasks this second: %i\ndb: %i, login: %i, create: %i\n",tasks+streamtasks,count_db,count_login,count_create);
+            if(tasks > 0){
+                //printf("\033[2J"); // clear
+                //printf("\033[H"); // move top left
+                printf("\033[4A");
+                printf("PROCESS:\n");
+                printf("tasks: %i [db: %i, login: %i, create: %i]                 \n",tasks+streamtasks,count_db,count_login,count_create);
+                printf("avg. task time: %Lfms [%lli ns]                  \n",((long double)time_lr)/tasks,(time_hr*100)/tasks);//(time_lr)/num_workers,(time_hr*100)/num_workers,(time_hr*100)/tasks);
+                printf("server load: %Lf%                   \n",(((long double)time_hr*100.)/num_workers)/(long double)time_hr_res)*100;
+            }
             count_db = 0;
             count_login = 0;
             count_create = 0;
             tasks = 0;
             streamtasks = 0;
+            time_hr = 0;
+            time_lr = 0;
         }
         int poll_count = POLL(fds, nfds, -1);
         //WSAPoll
@@ -172,7 +183,7 @@ int main(int argc, char** argv) {
                 fds[nfds-1].fd = -1;
                 nfds--;
                 if(nfds == 1){
-                    printf("all connections timed out\n");
+                    //printf("all connections timed out\n");
                 }
                 //printf("nfds: %i\n",nfds);
                 /*for (int j = i; j < nfds - 1; j++) {

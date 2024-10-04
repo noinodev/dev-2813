@@ -171,7 +171,7 @@ int http(int socket) {
 
 
     int j = send(socket, message, strlen(message), 0);
-    printf("SEND %i BYTES:\n%s\n",j,message);
+    //printf("SEND %i BYTES:\n%s\n",j,message);
     if(j <= 0){
         //printf("%i, %d ",j,WSAGetLastError());
         return 0;
@@ -214,7 +214,7 @@ int main(int argc, char** argv) {
     printf("ok!\n");
 
     // integration test, fire off packets as fast as possible
-    long double avgtime;
+    long double avgtime = 0;
     char buff[1024] = {0};
     for(int j = 0; j < pc; j++){
         int t = clock();
@@ -225,12 +225,12 @@ int main(int argc, char** argv) {
         if(bytes <= 0) perror("recv");
         else printf("RECV %i BYTES:\n",bytes);
         buff[bytes] = 0;
-        avgtime += (double)time/pc;
-        printf("%s\n",buff);
-        printf("PONG [%lf]\n-------------\n\n",time);
+        avgtime += (long double)time/pc;
+        //printf("%s\n",buff);
+        printf("PONG [%ims]\n-------------\n",time);
     }
 
-    printf("Average response time: %lf",avgtime);
+    printf("Average response time: %Lf",avgtime);
     
     #ifdef _WIN32
     cleanup_winsock();
