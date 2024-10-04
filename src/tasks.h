@@ -29,7 +29,7 @@ typedef struct Task{
 
 // Circular queue
 typedef struct {
-    Task tasks[QUEUE_SIZE];
+    Task* tasks;//[QUEUE_SIZE];
     int head;
     int tail;
     int count;

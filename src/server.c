@@ -57,6 +57,8 @@ int main(int argc, char** argv) {
     int addrlen = sizeof(address);
     char buffer[BUFFER_SIZE];
 
+    task_queue.tasks = (Task*)malloc(QUEUE_SIZE*sizeof(Task));
+
     // init thread pool
     pthread_t workers[num_workers];
     for (int i = 0; i < num_workers; ++i) pthread_create(&workers[i], NULL, worker_thread, NULL);
@@ -111,15 +113,17 @@ int main(int argc, char** argv) {
     while (1) {
         if(clock()-time > CLOCKS_PER_SEC){
             time = clock();
-            if(tasks > 0){
-                //printf("\033[2J"); // clear
+            //if(tasks > 0){
+            int t = tasks>0?tasks:1;
+                printf("\033[2J"); // clear
                 //printf("\033[H"); // move top left
-                printf("\033[4A");
-                printf("PROCESS:\n");
-                printf("tasks: %i [db: %i, login: %i, create: %i]                 \n",tasks+streamtasks,count_db,count_login,count_create);
-                printf("avg. task time: %Lfms [%lli ns]                  \n",((long double)time_lr)/tasks,(time_hr*100)/tasks);//(time_lr)/num_workers,(time_hr*100)/num_workers,(time_hr*100)/tasks);
-                printf("server load: %Lf%                   \n",(((long double)time_hr*100.)/num_workers)/(long double)time_hr_res)*100;
-            }
+                printf("\033[5A");
+                printf("clients: %i\n",nfds-1);
+                printf("tasks: %i [db: %i, login: %i, create: %i]\n",tasks+streamtasks,count_db,count_login,count_create);
+                printf("avg. task time: %Lfms [%lli ns]\n",((long double)time_lr)/t,(time_hr*100)/t);
+                printf("avg. time per client: %Lfms [%lli ns]\n",((long double)time_lr/(nfds>1?nfds-1:1)),(time_hr*100)/(nfds>1?nfds-1:1));
+                printf("server load: %Lf%\n",(((long double)time_hr*100.)/num_workers)/(long double)time_hr_res)*100;
+            //}
             count_db = 0;
             count_login = 0;
             count_create = 0;
@@ -203,6 +207,7 @@ int main(int argc, char** argv) {
     free(fds);
     free(fd_block);
     free(fd_timeout);
+    free(task_queue.tasks);
 
     // cleanup
     CLOSE_SOCKET(server_fd);

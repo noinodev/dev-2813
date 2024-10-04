@@ -228,6 +228,7 @@ int main(int argc, char** argv) {
         avgtime += (long double)time/pc;
         //printf("%s\n",buff);
         printf("PONG [%ims]\n-------------\n",time);
+        Sleep(100);
     }
 
     printf("Average response time: %Lf",avgtime);

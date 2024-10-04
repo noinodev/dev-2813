@@ -15,7 +15,7 @@ const char* sqlexec[] = {
 
 // Circular buffer definition, global scope
 TaskQueue task_queue = {
-    .tasks = {{0}},
+    .tasks = NULL,
     .head = 0, .tail = 0, .count = 0,
     .mutex = PTHREAD_MUTEX_INITIALIZER,
     .cond = PTHREAD_COND_INITIALIZER

@@ -182,46 +182,24 @@ int http(int socket) {
 }
 
 typedef struct ccpc {
-    int cc,pc;
+    int cc,pc,id;
     struct sockaddr_in server;
 } ccpc;
 
+int* clientsock;
+
 void* worker_thread(void* arg){
     ccpc *a = (ccpc*)arg;
-    // create TCP socket
-    int* clientsock = malloc(a->cc*sizeof(int));
-    for(int i = 0; i < a->cc; i++){
-        clientsock[i] = socket(AF_INET, SOCK_STREAM, 0);
-        //int flag = 1;
-        //setsockopt(clientsock[i], IPPROTO_TCP, TCP_NODELAY, (void *)&flag, sizeof(int));
-        if (clientsock[i]  == INVALID_SOCKET_CODE) {
-            perror("socket");
-            #ifdef _WIN32
-            cleanup_winsock();
-            #endif
-            exit(EXIT_FAILURE);
-        }
-    }
-
-    printf("Attempting to connect... ");
-
-    // attempt connection
-    for(int i = 0; i < a->cc; i++){
-        int res = connect(clientsock[i], (struct sockaddr *) &a->server, sizeof(a->server));
-        if (res < 0) {
-            perror("ERROR connection failed");
-            return 0;
-        }else printf("%i,",i);
-    }
-    printf("all sockets open!\n");
+    printf("worker %d ok, ",a->id);
+    int offset = a->cc*(a->id);
+    //thread++;
 
     // integration test, fire off packets as fast as possible
     int time = clock();
     for(int j = 0; j < a->pc; j++){
         for(int i = 0; i < a->cc; i++){
             if(clock()-time > 10*CLOCKS_PER_SEC) goto end;
-            if(http(clientsock[i]) == 0){
-                //printf("failed at %i,%i\n",j,i);
+            if(clientsock[i+offset] == -1 || http(clientsock[i+offset]) == 0){
                 fails += a->cc-i;
                 break;
             }else succs++;
@@ -231,8 +209,6 @@ void* worker_thread(void* arg){
     // cleanup
     end:
     printf("time to send: %lf\n",((double)(clock()-time))/CLOCKS_PER_SEC);
-    for(int i = 0; i < a->cc; i++) CLOSE_SOCKET(clientsock[i]);
-    free(clientsock);
     return NULL;
 }
 
@@ -251,16 +227,51 @@ int main(int argc, char** argv) {
     server.sin_family = AF_INET;
     server.sin_port = htons(8888);
 
-    ccpc a = {cc,pc,server};
+    clientsock = malloc(cc*tc*sizeof(int));
+    for(int i = 0; i < cc*tc; i++){
+        clientsock[i] = socket(AF_INET, SOCK_STREAM, 0);
+        //int flag = 1;
+        //setsockopt(clientsock[i], IPPROTO_TCP, TCP_NODELAY, (void *)&flag, sizeof(int));
+        if (clientsock[i]  == INVALID_SOCKET_CODE) {
+            perror("socket");
+            #ifdef _WIN32
+            cleanup_winsock();
+            #endif
+            exit(EXIT_FAILURE);
+        }
+
+        int res = connect(clientsock[i], (struct sockaddr *) &server, sizeof(server));
+        if (res < 0) {
+            perror("ERROR connection failed");
+            CLOSE_SOCKET(clientsock[i]);
+            clientsock[i] = -1;
+            //return 0;
+        }else printf("%i,",i);
+    }
+
+    printf("\nall sockets connected!\n");
+
+    //ccpc a = {cc,pc,server};
+    ccpc* args = calloc(tc,sizeof(ccpc));
     pthread_t* workers = (pthread_t*)malloc(tc*sizeof(pthread_t));
-    for (int i = 0; i < tc; ++i) pthread_create(&workers[i], NULL, worker_thread, (void*)&a);
-    
+    for (int i = 0; i < tc; i++){
+        args[i].cc = cc;
+        args[i].pc = pc;
+        args[i].id = i;
+        args[i].server = server;
+        pthread_create(&workers[i], NULL, worker_thread, (void*)&args[i]);
+    }
     
 
-    for (int i = 0; i < tc; ++i) pthread_join(workers[i],NULL);
+    for (int i = 0; i < tc; i++) pthread_join(workers[i],NULL);
     printf("packets: %i\n",succs);
     printf("fails: %i\n",fails);
     free(workers);
+    free(args);
+    for(int i = 0; i < cc*tc; i++){
+        CLOSE_SOCKET(clientsock[i]);
+    }
+    free(clientsock);
     #ifdef _WIN32
     cleanup_winsock();
     #endif
