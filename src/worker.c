@@ -10,6 +10,7 @@ const char* URI[TASK_COUNT] = {"/auth/create", "/auth/login", "/api/sample", "/a
 
 // worker thread function
 void* worker_thread(void* arg) {
+    unsigned char* thread = (unsigned char*)arg;
     // connect to database
     printf("connection to postgres... ");
     PGconn* conn = PQconnectdb("user=postgres dbname=postgres password=dev2813 hostaddr=127.0.0.1 port=5432");
@@ -35,6 +36,7 @@ void* worker_thread(void* arg) {
 
     while (1) {
         // pop task from task queue, this is where i would implement work stealing if i werent lazy
+        *thread = 1;
         if(stream == 0){
             dequeue_task(&task);
             tasks++;
@@ -42,6 +44,7 @@ void* worker_thread(void* arg) {
             stream = 0;
             streamtasks++;
         }
+        *thread = 2;
 
         int time = clock();
         LARGE_INTEGER frequency, start, end;

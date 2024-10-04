@@ -120,11 +120,12 @@ int task_auth_create(Task* task, const json_t* json, PGconn* conn){
         char json[128];
         snprintf(json,128,"{\"api_key\": \"%s\"}",authkey);
         httpjson(task->socket,json);
+        count_create++;
         //printf("create:! %s\n",json);
         ret = 2;
     }
     PQclear(pgres);
-    count_create++;
+    //count_create++;
     return ret;
 }
 
@@ -158,6 +159,7 @@ int task_auth_get(Task* task, const json_t* json, PGconn* conn){
             snprintf(json,128,"{\"api_key\": \"%s\"}",authkey);
             // return api token to client
             httpjson(task->socket,json);
+            count_login++;
             //printf("login:! %s\n",json);
             ret = 2;
         }else goto fail;
@@ -170,7 +172,6 @@ int task_auth_get(Task* task, const json_t* json, PGconn* conn){
     http(task->socket,401,"Unauthorized","Incorrect username or password");
 
     PQclear(pgres);
-    count_login++;
     return ret;
 }
 

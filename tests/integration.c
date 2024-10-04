@@ -204,6 +204,7 @@ void* worker_thread(void* arg){
                 break;
             }else succs++;
         }
+        Sleep(1);
     }
 
     // cleanup
@@ -246,7 +247,7 @@ int main(int argc, char** argv) {
             CLOSE_SOCKET(clientsock[i]);
             clientsock[i] = -1;
             //return 0;
-        }else printf("%i,",i);
+        }else printf("\r%i/%i",i,tc*cc);
     }
 
     printf("\nall sockets connected!\n");

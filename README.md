@@ -9,5 +9,17 @@ Windows with MinGW:
  - install openssl and libpq dependencies
  - cd into root folder
  - run 'mingw32-make server'
- - run '.\bin\server'
+ - run '.\bin\server <thread count>'
+
+tests/ instructions
+integration.c - server load testing
+ - run .\bin\server <thread count>
+ - gcc compile integration.c (windows requires lws2_32 dependency)
+ - run compiled executable '.\a.exe <thread count> <socket count> <packet count>'
+
+time.c - server latency testing
+ - run .\bin\server <thread count>
+ - gcc compile time.c (windows requires lws2_32 dependency)
+ - run compiled executable '.\a.exe <packet count>'
+
 

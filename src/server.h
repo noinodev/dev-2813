@@ -54,6 +54,7 @@ extern struct pollfd* fds; // array of active sockets
 extern char* fd_block; // array of blocked sockets ( binary packets exceeding buffer size )
 extern _Atomic int tasks,streamtasks,count_db,count_login,count_create;
 extern _Atomic long long int time_hr,time_hr_res,time_lr;
+extern _Atomic unsigned char exec[1000];
 
 void* worker_thread(void* arg); // worker thread function
 

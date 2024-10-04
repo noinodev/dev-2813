@@ -44,6 +44,7 @@ char* fd_block;
 int* fd_timeout;
 _Atomic int tasks = 0, streamtasks = 0, count_db = 0, count_create = 0, count_login = 0;
 _Atomic long long int time_hr = 0, time_hr_res = 0, time_lr = 0;
+_Atomic unsigned char exec[1000];
 
 int main(int argc, char** argv) {
     // init server
@@ -58,10 +59,11 @@ int main(int argc, char** argv) {
     char buffer[BUFFER_SIZE];
 
     task_queue.tasks = (Task*)malloc(QUEUE_SIZE*sizeof(Task));
+    memset(exec,0,1000);
 
     // init thread pool
     pthread_t workers[num_workers];
-    for (int i = 0; i < num_workers; ++i) pthread_create(&workers[i], NULL, worker_thread, NULL);
+    for (int i = 0; i < num_workers; ++i) pthread_create(&workers[i], NULL, worker_thread, (void*)&exec[i]);
 
     #ifdef _WIN32
     init_winsock(); // self explanatory i think
@@ -115,15 +117,24 @@ int main(int argc, char** argv) {
             time = clock();
             //if(tasks > 0){
             int t = tasks>0?tasks:1;
-                printf("\033[2J"); // clear
-                //printf("\033[H"); // move top left
-                printf("\033[5A");
-                printf("clients: %i\n",nfds-1);
-                printf("tasks: %i [db: %i, login: %i, create: %i]\n",tasks+streamtasks,count_db,count_login,count_create);
-                printf("avg. task time: %Lfms [%lli ns]\n",((long double)time_lr)/t,(time_hr*100)/t);
-                printf("avg. time per client: %Lfms [%lli ns]\n",((long double)time_lr/(nfds>1?nfds-1:1)),(time_hr*100)/(nfds>1?nfds-1:1));
-                printf("server load: %Lf%\n",(((long double)time_hr*100.)/num_workers)/(long double)time_hr_res)*100;
-            //}
+
+            printf("\033[2J"); // clear
+            printf("\033[6A");
+            printf("clients: %i\n",nfds-1);
+            printf("threads: ");
+            for(int i = 0; i < num_workers; i++){
+                char j;
+                if(exec[i] == 0) j = 0;
+                else if(exec[i] == 1) j = '.';
+                else if(exec[i] == 2) j = '|';
+                printf("%c",j);
+            }
+            printf("\n");
+            printf("tasks: %i [db: %i, login: %i, create: %i]\n",tasks+streamtasks,count_db,count_login,count_create);
+            printf("avg. task time: %Lfms [%lli ns]\n",((long double)time_lr)/t,(time_hr*100)/t);
+            printf("avg. time per client: %Lfms [%lli ns]\n",((long double)time_lr/(nfds>1?nfds-1:1)),(time_hr*100)/(nfds>1?nfds-1:1));
+            printf("server load: %Lf%\n",(((long double)time_hr*100.)/num_workers)/(long double)time_hr_res)*100;
+
             count_db = 0;
             count_login = 0;
             count_create = 0;
